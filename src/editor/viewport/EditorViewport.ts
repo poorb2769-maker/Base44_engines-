@@ -10,6 +10,8 @@ export class EditorViewport {
   private meshMap: Map<string, THREE.Object3D> = new Map();
   private selectedEntity: Entity | null = null;
   private onEntitySelected: (entity: Entity) => void;
+  private raycaster: THREE.Raycaster = new THREE.Raycaster();
+  private mouse: THREE.Vector2 = new THREE.Vector2();
 
   constructor(scene: Scene, onEntitySelected: (entity: Entity) => void) {
     this.scene = scene;
@@ -22,6 +24,7 @@ export class EditorViewport {
     this.renderer.setSize(container.clientWidth, container.clientHeight);
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.setClearColor(0x2a2a2a);
+    this.renderer.shadowMap.enabled = true;
     container.appendChild(this.renderer.domElement);
 
     // Camera
@@ -44,6 +47,7 @@ export class EditorViewport {
 
     const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
     directionalLight.position.set(10, 10, 10);
+    directionalLight.castShadow = true;
     this.threeScene.add(directionalLight);
 
     // Grid
@@ -60,6 +64,7 @@ export class EditorViewport {
     // Events
     window.addEventListener('resize', () => this.onWindowResize());
     this.renderer.domElement.addEventListener('click', (e) => this.onCanvasClick(e));
+    this.renderer.domElement.addEventListener('contextmenu', (e) => e.preventDefault());
 
     // Animation loop
     this.animate();
@@ -76,6 +81,19 @@ export class EditorViewport {
     }
     
     this.threeScene.add(mesh);
+  }
+
+  removeMesh(entity: Entity): void {
+    const mesh = this.meshMap.get(entity.id);
+    if (mesh) {
+      this.threeScene.remove(mesh);
+      this.meshMap.delete(entity.id);
+    }
+
+    // Remove children meshes
+    for (const child of entity.children) {
+      this.removeMesh(child);
+    }
   }
 
   highlightEntity(entity: Entity): void {
@@ -95,7 +113,23 @@ export class EditorViewport {
   }
 
   private addOutline(mesh: THREE.Object3D): void {
-    const outline = new THREE.EdgesGeometry(mesh instanceof THREE.Mesh ? mesh.geometry : new THREE.BoxGeometry());
+    let geometry: THREE.BufferGeometry | null = null;
+    
+    if (mesh instanceof THREE.Mesh) {
+      geometry = mesh.geometry;
+    } else if (mesh instanceof THREE.Group) {
+      // For groups, create a bounding box
+      const box = new THREE.Box3().setFromObject(mesh);
+      geometry = new THREE.BoxGeometry(
+        box.max.x - box.min.x,
+        box.max.y - box.min.y,
+        box.max.z - box.min.z
+      );
+    } else {
+      geometry = new THREE.BoxGeometry();
+    }
+
+    const outline = new THREE.EdgesGeometry(geometry);
     const line = new THREE.LineSegments(outline, new THREE.LineBasicMaterial({ color: 0x00ff00, linewidth: 2 }));
     line.name = 'outline';
     mesh.add(line);
@@ -110,21 +144,18 @@ export class EditorViewport {
 
   private onCanvasClick(event: MouseEvent): void {
     const rect = this.renderer.domElement.getBoundingClientRect();
-    const mouse = new THREE.Vector2(
-      ((event.clientX - rect.left) / rect.width) * 2 - 1,
-      -((event.clientY - rect.top) / rect.height) * 2 + 1
-    );
+    this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
-    const raycaster = new THREE.Raycaster();
-    raycaster.setFromCamera(mouse, this.camera);
+    this.raycaster.setFromCamera(this.mouse, this.camera);
 
     const meshes = Array.from(this.meshMap.values());
-    const intersects = raycaster.intersectObjects(meshes, true);
+    const intersects = this.raycaster.intersectObjects(meshes, true);
 
     if (intersects.length > 0) {
       const clickedMesh = intersects[0].object;
       for (const [entityId, mesh] of this.meshMap.entries()) {
-        if (mesh === clickedMesh || mesh.children.includes(clickedMesh)) {
+        if (mesh === clickedMesh || mesh.children.includes(clickedMesh) || this.isChildOf(clickedMesh, mesh)) {
           const entity = this.scene.getEntityById(entityId);
           if (entity) {
             this.onEntitySelected(entity);
@@ -133,6 +164,15 @@ export class EditorViewport {
         }
       }
     }
+  }
+
+  private isChildOf(child: THREE.Object3D, parent: THREE.Object3D): boolean {
+    let current: THREE.Object3D | null = child;
+    while (current) {
+      if (current === parent) return true;
+      current = current.parent;
+    }
+    return false;
   }
 
   private onWindowResize(): void {
@@ -164,6 +204,29 @@ export class EditorViewport {
         }
       }
     }
+  }
+
+  getThreeScene(): THREE.Scene {
+    return this.threeScene;
+  }
+
+  getCamera(): THREE.PerspectiveCamera {
+    return this.camera;
+  }
+
+  getRenderer(): THREE.WebGLRenderer {
+    return this.renderer;
+  }
+
+  getMeshForEntity(entity: Entity): THREE.Object3D | undefined {
+    return this.meshMap.get(entity.id);
+  }
+
+  clear(): void {
+    for (const mesh of this.meshMap.values()) {
+      this.threeScene.remove(mesh);
+    }
+    this.meshMap.clear();
   }
 }
 

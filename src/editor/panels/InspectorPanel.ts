@@ -1,11 +1,13 @@
-import { Entity, Transform } from '@engine';
+import { Entity, Transform, SceneSerializer } from '@engine';
 
 export class InspectorPanel {
   private container: HTMLElement;
   private currentEntity: Entity | null = null;
+  private onPropertyChanged: () => void;
 
-  constructor() {
+  constructor(onPropertyChanged?: () => void) {
     this.container = document.getElementById('inspector-panel') as HTMLElement;
+    this.onPropertyChanged = onPropertyChanged || (() => {});
   }
 
   updateInspector(entity: Entity): void {
@@ -32,6 +34,7 @@ export class InspectorPanel {
     const nameInput = infoGroup.querySelector('#entity-name') as HTMLInputElement;
     nameInput.addEventListener('change', (e) => {
       entity.name = (e.target as HTMLInputElement).value;
+      this.onPropertyChanged();
     });
 
     // Transform Component
@@ -94,6 +97,7 @@ export class InspectorPanel {
           else if (field === 'scaleX') transform.scale.x = value;
           else if (field === 'scaleY') transform.scale.y = value;
           else if (field === 'scaleZ') transform.scale.z = value;
+          this.onPropertyChanged();
         });
       });
     }

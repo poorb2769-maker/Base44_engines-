@@ -40,7 +40,7 @@ export class HierarchyPanel {
     if (entity.children.length > 0) {
       const toggleBtn = document.createElement('span');
       toggleBtn.className = 'tree-item-toggle';
-      toggleBtn.textContent = this.expandedEntities.has(entity.id) ? '▼' : '▶';
+      toggleBtn.textContent = this.expandedEntities.has(entity.id) ? '🔽' : '▶';
       toggleBtn.onclick = (e) => {
         e.stopPropagation();
         if (this.expandedEntities.has(entity.id)) {
@@ -61,7 +61,7 @@ export class HierarchyPanel {
     // Icon
     const icon = document.createElement('span');
     icon.className = 'tree-item-icon';
-    icon.textContent = entity.children.length > 0 ? '📁' : '⬤';
+    icon.textContent = entity.children.length > 0 ? '📁' : '●';
     div.appendChild(icon);
 
     // Name
