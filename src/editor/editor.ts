@@ -1,11 +1,20 @@
 import * as THREE from 'three';
-import { Scene, Entity, Transform, GLBLoader, CommandHistory, AddEntityCommand, DeleteEntityCommand, DuplicateEntityCommand } from '@engine';
+import { Scene, Entity, Transform, GLBLoader, CommandHistory, AddEntityCommand, DeleteEntityCommand, DuplicateEntityCommand, Light, LightType } from '@engine';
 import { EditorViewport } from './viewport/EditorViewport';
 import { HierarchyPanel } from './panels/HierarchyPanel';
 import { InspectorPanel } from './panels/InspectorPanel';
 import { EditorToolbar } from './toolbar/EditorToolbar';
 import { TransformGizmo } from './viewport/TransformGizmo';
 import { SceneSerializer } from '@engine';
+import { MaterialPanel } from './panels/MaterialPanel';
+import { LightingPanel } from './panels/LightingPanel';
+import { AnimationTimeline } from './animation/AnimationTimeline';
+import { LightRenderer } from './viewport/LightRenderer';
+import { SceneExporter } from './export/SceneExporter';
+import { PresetManager } from './managers/PresetManager';
+import { MultiSelect } from './managers/MultiSelect';
+import { PrefabManager } from './managers/PrefabManager';
+import { ViewportSettings, GridSettings } from './settings/ViewportSettings';
 
 class Editor {
   private scene: Scene;
@@ -13,19 +22,40 @@ class Editor {
   private viewport: EditorViewport;
   private hierarchyPanel: HierarchyPanel;
   private inspectorPanel: InspectorPanel;
+  private materialPanel: MaterialPanel;
+  private lightingPanel: LightingPanel;
+  private animationTimeline: AnimationTimeline;
   private toolbar: EditorToolbar;
   private transformGizmo: TransformGizmo;
+  private lightRenderer: LightRenderer;
   private selectedEntity: Entity | null = null;
+  private presetManager: PresetManager;
+  private multiSelect: MultiSelect;
+  private prefabManager: PrefabManager;
+  private viewportSettings: ViewportSettings;
+  private lastFrameTime: number = 0;
 
   constructor() {
     this.scene = new Scene('Untitled Scene');
     this.commandHistory = new CommandHistory();
+    this.presetManager = new PresetManager();
+    this.multiSelect = new MultiSelect();
+    this.prefabManager = new PrefabManager();
+    this.viewportSettings = new ViewportSettings();
     
+    // Load saved data
+    this.presetManager.loadPresetsFromStorage();
+    this.prefabManager.loadPrefabsFromStorage();
+
     // Initialize UI components
     this.viewport = new EditorViewport(this.scene, this.onEntitySelected.bind(this));
+    this.lightRenderer = new LightRenderer(this.viewport.getThreeScene());
     this.transformGizmo = new TransformGizmo(this.viewport);
     this.hierarchyPanel = new HierarchyPanel(this.scene, this.onHierarchySelect.bind(this), this.onHierarchyContextMenu.bind(this));
     this.inspectorPanel = new InspectorPanel(this.onPropertyChanged.bind(this));
+    this.materialPanel = new MaterialPanel();
+    this.lightingPanel = new LightingPanel(this.scene, this.viewport, this.onLightingChanged.bind(this));
+    this.animationTimeline = new AnimationTimeline('animation-timeline');
     this.toolbar = new EditorToolbar(
       this.onAddCube.bind(this),
       this.onAddEmpty.bind(this),
@@ -35,12 +65,35 @@ class Editor {
       this.onDelete.bind(this),
       this.onDuplicate.bind(this),
       this.onSaveScene.bind(this),
-      this.onLoadScene.bind(this)
+      this.onLoadScene.bind(this),
+      this.onExportWebGL.bind(this),
+      this.onAddLight.bind(this),
+      this.onSaveAsPreset.bind(this),
+      this.onRotateMode.bind(this),
+      this.onScaleMode.bind(this)
     );
 
     // Setup keyboard shortcuts
     this.setupKeyboardShortcuts();
+    this.setupMultiSelect();
+    this.animationLoop();
     this.updateUI();
+  }
+
+  private setupMultiSelect(): void {
+    this.multiSelect.setOnSelectionChanged((entityIds) => {
+      // Update UI for multi-select
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === 'a') {
+          e.preventDefault();
+          const allIds = this.scene.getAllEntities().map(e => e.id);
+          this.multiSelect.selectAll(allIds);
+        }
+      }
+    });
   }
 
   private setupKeyboardShortcuts(): void {
@@ -62,14 +115,29 @@ class Editor {
       } else if (e.key === 'Delete') {
         e.preventDefault();
         this.onDelete();
+      } else if (e.key === 'g') {
+        e.preventDefault();
+        this.viewportSettings.gridSettings.snap = !this.viewportSettings.gridSettings.snap;
+      } else if (e.key === 'w') {
+        e.preventDefault();
+        this.onTranslateMode();
+      } else if (e.key === 'e') {
+        e.preventDefault();
+        this.onRotateMode();
+      } else if (e.key === 'r') {
+        e.preventDefault();
+        this.onScaleMode();
       }
     });
   }
 
   private onEntitySelected(entity: Entity): void {
     this.selectedEntity = entity;
+    this.multiSelect.clear();
+    this.multiSelect.add(entity.id);
     this.hierarchyPanel.setSelected(entity);
     this.inspectorPanel.updateInspector(entity);
+    this.materialPanel.updatePanel(entity);
     this.viewport.highlightEntity(entity);
     this.transformGizmo.attachToEntity(entity);
     this.updateUI();
@@ -87,7 +155,12 @@ class Editor {
     if (this.selectedEntity) {
       this.viewport.refresh();
       this.transformGizmo.updateGizmo();
+      this.lightRenderer.updateLight(this.selectedEntity);
     }
+  }
+
+  private onLightingChanged(): void {
+    this.viewport.refresh();
   }
 
   private onAddCube(): void {
@@ -147,6 +220,10 @@ class Editor {
     fileInput.click();
   }
 
+  private onAddLight(): void {
+    this.lightingPanel.showLightCreationMenu();
+  }
+
   private onDelete(): void {
     if (!this.selectedEntity || this.selectedEntity === this.scene.root) return;
 
@@ -154,6 +231,7 @@ class Editor {
     this.commandHistory.execute(command);
 
     this.viewport.removeMesh(this.selectedEntity);
+    this.lightRenderer.removeLight(this.selectedEntity.id);
     this.viewport.refresh();
     this.hierarchyPanel.refresh();
     this.inspectorPanel.clear();
@@ -170,10 +248,17 @@ class Editor {
 
     const duplicated = (command as any).getDuplicatedEntity();
     if (duplicated) {
-      // Add mesh to viewport
       const mesh = duplicated.getComponent<any>('mesh');
       if (mesh && mesh.object3d) {
         this.viewport.addMesh(duplicated, mesh.object3d);
+      }
+
+      const light = duplicated.getComponent<Light>('light');
+      if (light) {
+        const threeLight = this.lightRenderer.createThreeLight(duplicated);
+        if (threeLight) {
+          this.viewport.addMesh(duplicated, threeLight);
+        }
       }
 
       this.hierarchyPanel.refresh();
@@ -225,19 +310,21 @@ class Editor {
         const serializer = new SceneSerializer();
         const loadedScene = await serializer.loadSceneFromFile(file);
         
-        // Clear current scene
         this.scene.clear();
         this.viewport.clear();
+        this.lightRenderer.clear();
         this.commandHistory.clear();
 
-        // Replace with loaded scene
         this.scene = loadedScene;
         
-        // Rebuild viewport
         const rebuildMeshes = (entity: Entity) => {
           const mesh = entity.getComponent<any>('mesh');
           if (mesh && mesh.object3d) {
             this.viewport.addMesh(entity, mesh.object3d);
+          }
+          const light = entity.getComponent<Light>('light');
+          if (light) {
+            const threeLight = this.lightRenderer.createThreeLight(entity);
           }
           for (const child of entity.children) {
             rebuildMeshes(child);
@@ -259,6 +346,44 @@ class Editor {
     };
     fileInput.click();
   }
+
+  private onExportWebGL(): void {
+    const json = SceneExporter.exportToWebGL(this.scene, this.viewport);
+    SceneExporter.downloadFile(json, `${this.scene.name}.json`, 'application/json');
+    
+    const html = SceneExporter.exportAsHTMLViewer(this.scene, this.viewport, this.scene.name);
+    SceneExporter.downloadFile(html, `${this.scene.name}-viewer.html`, 'text/html');
+  }
+
+  private onSaveAsPreset(): void {
+    if (!this.selectedEntity) return;
+    const presetName = prompt('Enter preset name:');
+    if (presetName) {
+      this.presetManager.savePreset(presetName, this.selectedEntity.toJSON());
+      console.log(`Preset '${presetName}' saved`);
+    }
+  }
+
+  private onTranslateMode(): void {
+    // Implementation for translate mode
+  }
+
+  private onRotateMode(): void {
+    // Implementation for rotate mode
+  }
+
+  private onScaleMode(): void {
+    // Implementation for scale mode
+  }
+
+  private animationLoop = (): void => {
+    requestAnimationFrame(this.animationLoop);
+    const now = performance.now() / 1000;
+    const deltaTime = now - this.lastFrameTime;
+    this.lastFrameTime = now;
+    
+    // Update animations, lights, etc.
+  };
 
   private updateUI(): void {
     this.toolbar.updateButtons(

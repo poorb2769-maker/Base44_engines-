@@ -12,7 +12,12 @@ export class EditorToolbar {
     onDelete: () => void,
     onDuplicate: () => void,
     onSaveScene: () => void,
-    onLoadScene: () => void
+    onLoadScene: () => void,
+    onExportWebGL: () => void,
+    onAddLight: () => void,
+    onSaveAsPreset: () => void,
+    onRotateMode: () => void,
+    onScaleMode: () => void
   ) {
     this.setupButtons(
       onAddCube,
@@ -23,7 +28,12 @@ export class EditorToolbar {
       onDelete,
       onDuplicate,
       onSaveScene,
-      onLoadScene
+      onLoadScene,
+      onExportWebGL,
+      onAddLight,
+      onSaveAsPreset,
+      onRotateMode,
+      onScaleMode
     );
   }
 
@@ -36,7 +46,12 @@ export class EditorToolbar {
     onDelete: () => void,
     onDuplicate: () => void,
     onSaveScene: () => void,
-    onLoadScene: () => void
+    onLoadScene: () => void,
+    onExportWebGL: () => void,
+    onAddLight: () => void,
+    onSaveAsPreset: () => void,
+    onRotateMode: () => void,
+    onScaleMode: () => void
   ): void {
     const btnAddCube = document.getElementById('btn-add-cube') as HTMLElement;
     const btnAddEmpty = document.getElementById('btn-add-empty') as HTMLElement;
@@ -48,15 +63,15 @@ export class EditorToolbar {
     const btnSaveScene = document.getElementById('btn-save') as HTMLElement;
     const btnLoadScene = document.getElementById('btn-load') as HTMLElement;
 
-    btnAddCube.onclick = onAddCube;
-    btnAddEmpty.onclick = onAddEmpty;
-    btnLoadGLB.onclick = onLoadGLB;
-    btnUndo.onclick = onUndo;
-    btnRedo.onclick = onRedo;
-    btnDelete.onclick = onDelete;
-    btnDuplicate.onclick = onDuplicate;
-    btnSaveScene.onclick = onSaveScene;
-    btnLoadScene.onclick = onLoadScene;
+    btnAddCube?.addEventListener('click', onAddCube);
+    btnAddEmpty?.addEventListener('click', onAddEmpty);
+    btnLoadGLB?.addEventListener('click', onLoadGLB);
+    btnUndo?.addEventListener('click', onUndo);
+    btnRedo?.addEventListener('click', onRedo);
+    btnDelete?.addEventListener('click', onDelete);
+    btnDuplicate?.addEventListener('click', onDuplicate);
+    btnSaveScene?.addEventListener('click', onSaveScene);
+    btnLoadScene?.addEventListener('click', onLoadScene);
 
     this.buttons.set('undo', btnUndo);
     this.buttons.set('redo', btnRedo);
