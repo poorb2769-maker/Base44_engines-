@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Base44 Engine - Editor</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: #1e1e1e;
+      color: #e0e0e0;
+      overflow: hidden;
+    }
+
+    #root {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .editor-container {
+      display: flex;
+      flex: 1;
+      gap: 0;
+    }
+
+    .panel {
+      background: #252526;
+      border-right: 1px solid #3e3e42;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .panel-header {
+      background: #2d2d30;
+      padding: 8px 12px;
+      border-bottom: 1px solid #3e3e42;
+      font-weight: 600;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .panel-content {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+
+    /* Left Panel - Hierarchy */
+    .left-panel {
+      width: 250px;
+    }
+
+    /* Center - Viewport */
+    .viewport-container {
+      flex: 1;
+      position: relative;
+      background: #1e1e1e;
+    }
+
+    #viewport {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Right Panel - Inspector */
+    .right-panel {
+      width: 300px;
+    }
+
+    /* Toolbar */
+    .toolbar {
+      background: #2d2d30;
+      padding: 8px 12px;
+      border-bottom: 1px solid #3e3e42;
+      display: flex;
+      gap: 4px;
+      align-items: center;
+    }
+
+    .toolbar-button {
+      background: #3e3e42;
+      border: none;
+      color: #cccccc;
+      padding: 6px 12px;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 500;
+      transition: background 0.2s;
+    }
+
+    .toolbar-button:hover {
+      background: #4e4e54;
+    }
+
+    .toolbar-button:active {
+      background: #5e5e64;
+    }
+
+    .toolbar-button.disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .toolbar-separator {
+      width: 1px;
+      height: 20px;
+      background: #3e3e42;
+      margin: 0 4px;
+    }
+
+    /* Tree Item */
+    .tree-item {
+      padding: 4px 8px;
+      cursor: pointer;
+      user-select: none;
+      border-left: 2px solid transparent;
+      margin-left: 4px;
+    }
+
+    .tree-item:hover {
+      background: #2e2e30;
+    }
+
+    .tree-item.selected {
+      background: #094771;
+      border-left-color: #0098ff;
+    }
+
+    .tree-item-icon {
+      display: inline-block;
+      margin-right: 4px;
+      width: 16px;
+      text-align: center;
+    }
+
+    .tree-item-toggle {
+      display: inline-block;
+      margin-right: 4px;
+      width: 16px;
+      cursor: pointer;
+    }
+
+    .tree-item-name {
+      font-size: 12px;
+    }
+
+    /* Inspector Properties */
+    .property-group {
+      padding: 8px 12px;
+      border-bottom: 1px solid #3e3e42;
+    }
+
+    .property-group-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      color: #858585;
+      margin-bottom: 8px;
+    }
+
+    .property-row {
+      display: flex;
+      align-items: center;
+      margin-bottom: 6px;
+      gap: 8px;
+    }
+
+    .property-label {
+      font-size: 12px;
+      flex: 0 0 80px;
+      color: #cccccc;
+    }
+
+    .property-input {
+      flex: 1;
+      background: #3e3e42;
+      border: 1px solid #555555;
+      color: #e0e0e0;
+      padding: 4px 6px;
+      border-radius: 2px;
+      font-size: 12px;
+      font-family: monospace;
+    }
+
+    .property-input:focus {
+      outline: none;
+      border-color: #0098ff;
+      background: #464646;
+    }
+
+    .property-unit {
+      font-size: 11px;
+      color: #858585;
+      width: 20px;
+    }
+
+    /* Context Menu */
+    .context-menu {
+      position: fixed;
+      background: #252526;
+      border: 1px solid #3e3e42;
+      border-radius: 3px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+      min-width: 160px;
+    }
+
+    .context-menu-item {
+      padding: 8px 12px;
+      font-size: 12px;
+      cursor: pointer;
+      border-bottom: 1px solid #3e3e42;
+      transition: background 0.2s;
+    }
+
+    .context-menu-item:last-child {
+      border-bottom: none;
+    }
+
+    .context-menu-item:hover {
+      background: #2e2e30;
+    }
+
+    /* File Input (Hidden) */
+    input[type='file'] {
+      display: none;
+    }
+
+    /* Scrollbar */
+    .panel-content::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .panel-content::-webkit-scrollbar-track {
+      background: #1e1e1e;
+    }
+
+    .panel-content::-webkit-scrollbar-thumb {
+      background: #424242;
+      border-radius: 4px;
+    }
+
+    .panel-content::-webkit-scrollbar-thumb:hover {
+      background: #4e4e4e;
+    }
+  </style>
+</head>
+<body>
+  <div id="root">
+    <!-- Toolbar -->
+    <div class="toolbar">
+      <button class="toolbar-button" id="btn-add-cube">+ Cube</button>
+      <button class="toolbar-button" id="btn-add-empty">+ Empty</button>
+      <button class="toolbar-button" id="btn-load-glb">📁 Load GLB</button>
+      
+      <div class="toolbar-separator"></div>
+      
+      <button class="toolbar-button" id="btn-undo">↶ Undo</button>
+      <button class="toolbar-button" id="btn-redo">↷ Redo</button>
+      
+      <div class="toolbar-separator"></div>
+      
+      <button class="toolbar-button" id="btn-delete">🗑 Delete</button>
+      <button class="toolbar-button" id="btn-duplicate">📋 Duplicate</button>
+      
+      <div class="toolbar-separator"></div>
+      
+      <button class="toolbar-button" id="btn-save">💾 Save Scene</button>
+      <button class="toolbar-button" id="btn-load">📂 Load Scene</button>
+    </div>
+
+    <!-- Main Editor -->
+    <div class="editor-container">
+      <!-- Left Panel: Hierarchy -->
+      <div class="panel left-panel">
+        <div class="panel-header">Hierarchy</div>
+        <div class="panel-content" id="hierarchy-panel"></div>
+      </div>
+
+      <!-- Center: Viewport -->
+      <div class="viewport-container">
+        <div id="viewport"></div>
+      </div>
+
+      <!-- Right Panel: Inspector -->
+      <div class="panel right-panel">
+        <div class="panel-header">Inspector</div>
+        <div class="panel-content" id="inspector-panel"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hidden File Inputs -->
+  <input type="file" id="glb-file-input" accept=".glb,.gltf" />
+  <input type="file" id="scene-file-input" accept=".json" />
+
+  <script type="module" src="./editor.ts"></script>
+</body>
+</html>
