@@ -1,9 +1,13 @@
-// Core
+// Core - Basic
 export { Entity, IComponent } from './core/Entity';
 export { Transform } from './core/Transform';
 export { Material, MaterialProps } from './core/Material';
 export { Light, LightType, LightProps } from './core/Light';
 export { Animation, AnimationTrack, AnimationKeyframe } from './core/Animation';
+
+// Core - Advanced
+export { ScriptComponent, ScriptContext } from './core/Script';
+export { ParticleSystem, ParticleSystemConfig, Particle } from './core/ParticleSystem';
 
 // Scene
 export { Scene } from './scene/Scene';
