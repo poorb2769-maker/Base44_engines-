@@ -1,21 +1,21 @@
-// Core - Basic
-export { Entity, IComponent } from './core/Entity';
-export { Transform } from './core/Transform';
-export { Material, MaterialProps } from './core/Material';
-export { Light, LightType, LightProps } from './core/Light';
-export { Animation, AnimationTrack, AnimationKeyframe } from './core/Animation';
+// Core exports
+export { Entity } from './core/entity';
+export { Component } from './core/component';
+export { Transform } from './core/transform';
+export { Scene as GameScene } from './scene/scene';
 
-// Core - Advanced
-export { ScriptComponent, ScriptContext } from './core/Script';
-export { ParticleSystem, ParticleSystemConfig, Particle } from './core/ParticleSystem';
+// Physics exports
+export { Rigidbody, RigidbodyConfig } from './physics/rigidbody';
+export { Collider, ColliderShape, ColliderConfig } from './physics/collider';
 
-// Scene
-export { Scene } from './scene/Scene';
-export { SceneSerializer } from './scene/SceneSerializer';
+// Input exports
+export { InputManager, KeyCode, MouseButton, GamepadState } from './input/input-manager';
 
-// Undo/Redo
-export { Command, CommandHistory } from './undo-redo';
-export { MoveEntityCommand, AddEntityCommand, RemoveEntityCommand, DuplicateEntityCommand, DeleteEntityCommand } from './undo-redo';
+// Animation exports
+export { AnimationController, AnimationState } from './animation/animation-controller';
 
-// Assets
-export { GLBLoader, LoadedModel } from './assets/GLBLoader';
+// Audio exports
+export { AudioManager, AudioListener, AudioSource } from './audio/audio-manager';
+
+// Undo/Redo exports
+export { Command, CommandManager } from './undo-redo/command';
